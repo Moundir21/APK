@@ -7,10 +7,10 @@ source.include_exts = py,kv,png,jpg,ttf
 requirements = python3,kivy
 orientation = portrait
 fullscreen = 0
+android.api = 33
+android.build_tools_version = 33.0.2
 version = 0.1
-android.api = 31
 android.minapi = 21
-android.sdk = 31
 android.ndk = 23b
 android.archs = armeabi-v7a, arm64-v8a
 
