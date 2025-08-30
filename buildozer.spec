@@ -1,10 +1,10 @@
 [app]
 
 # (str) Title of your application
-title = SampleApp
+title = Moundir
 
 # (str) Package name
-package.name = nfsApk
+package.name = moundir
 
 # (str) Package domain (needed for android/ios packaging)
 package.domain = org.novfensec
