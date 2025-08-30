@@ -1,120 +1,88 @@
-# main.py
-import random
 from kivy.app import App
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
+from kivy.uix.widget import Widget
 from kivy.clock import Clock
+from kivy.properties import NumericProperty, ReferenceListProperty, ListProperty
+from kivy.vector import Vector
+from random import randint, choice
+from kivy.uix.label import Label
+from kivy.graphics import Color, Ellipse
 
-WIN_LINES = [
-    (0, 1, 2), (3, 4, 5), (6, 7, 8),  # rows
-    (0, 3, 6), (1, 4, 7), (2, 5, 8),  # cols
-    (0, 4, 8), (2, 4, 6)              # diagonals
+# ألوان عشوائية
+colors = [
+    (1, 0, 0),  # أحمر
+    (0, 1, 0),  # أخضر
+    (0, 0, 1),  # أزرق
+    (1, 1, 0),  # أصفر
+    (1, 0, 1),  # بنفسجي
+    (0, 1, 1),  # سماوي
 ]
 
-class TicTacToe(GridLayout):
+class Ball(Widget):
+    velocity_x = NumericProperty(0)
+    velocity_y = NumericProperty(0)
+    velocity = ReferenceListProperty(velocity_x, velocity_y)
+    color = ListProperty([1, 0, 0])  # لون افتراضي أحمر
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.cols = 1
-        self.status = Label(text="Your turn (X)", size_hint_y=None, height=50)
-        self.add_widget(self.status)
+        with self.canvas:
+            self.c = Color(*self.color)
+            self.shape = Ellipse(pos=self.pos, size=self.size)
+        self.bind(pos=self.update_graphics, size=self.update_graphics, color=self.update_color)
 
-        self.board = [""] * 9
-        self.grid = GridLayout(cols=3, padding=10, spacing=10)
-        self.buttons = []
+    def update_graphics(self, *args):
+        self.shape.pos = self.pos
+        self.shape.size = self.size
 
-        for i in range(9):
-            btn = Button(text="", font_size=40)
-            btn.index = i
-            btn.bind(on_release=self.on_human_move)
-            self.buttons.append(btn)
-            self.grid.add_widget(btn)
+    def update_color(self, *args):
+        self.c.rgb = self.color
 
-        self.add_widget(self.grid)
+    def move(self):
+        self.pos = Vector(*self.velocity) + self.pos
 
-        controls = BoxLayout(size_hint_y=None, height=60, spacing=10, padding=(10, 0))
-        self.reset_btn = Button(text="Restart")
-        self.reset_btn.bind(on_release=lambda *_: self.reset())
-        controls.add_widget(self.reset_btn)
-        self.add_widget(controls)
+class PongGame(Widget):
+    score = NumericProperty(0)
 
-        self.game_over = False
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # إنشاء الكرة
+        self.ball = Ball(pos=(randint(100, 400), randint(100, 400)), size=(50, 50))
+        self.ball.velocity = Vector(4, 4)
+        self.add_widget(self.ball)
 
-    def on_human_move(self, btn):
-        if self.game_over or self.board[btn.index] != "":
-            return
-        self.place_mark(btn.index, "X")
-        winner = self.check_winner()
-        if winner or self.is_draw():
-            self.finish(winner)
-            return
-        self.status.text = "AI thinking… (O)"
-        # small delay to feel responsive
-        Clock.schedule_once(lambda *_: self.ai_move(), 0.25)
+        # عرض النقاط
+        self.score_label = Label(text=f"Score: {self.score}", font_size=24, pos=(10, self.height - 40))
+        self.add_widget(self.score_label)
 
-    def ai_move(self):
-        if self.game_over:
-            return
-        empty = [i for i, v in enumerate(self.board) if v == ""]
-        if not empty:
-            self.finish(None)
-            return
-        idx = random.choice(empty)
-        self.place_mark(idx, "O")
-        winner = self.check_winner()
-        if winner or self.is_draw():
-            self.finish(winner)
-        else:
-            self.status.text = "Your turn (X)"
+        Clock.schedule_interval(self.update, 1.0 / 60.0)
 
-    def place_mark(self, idx, mark):
-        self.board[idx] = mark
-        self.buttons[idx].text = mark
-        self.buttons[idx].disabled = True
+    def update(self, dt):
+        self.ball.move()
 
-    def check_winner(self):
-        for a, b, c in WIN_LINES:
-            if self.board[a] and self.board[a] == self.board[b] == self.board[c]:
-                # highlight winning line
-                for i in (a, b, c):
-                    self.buttons[i].background_color = (0, 1, 0, 1)
-                return self.board[a]
-        return None
+        # الاصطدام بالحواف
+        bounced = False
+        if (self.ball.y < 0) or (self.ball.top > self.height):
+            self.ball.velocity_y *= -1
+            bounced = True
+        if (self.ball.x < 0) or (self.ball.right > self.width):
+            self.ball.velocity_x *= -1
+            bounced = True
 
-    def is_draw(self):
-        return all(self.board) and self.check_winner() is None
+        # عند الاصطدام
+        if bounced:
+            # تغيير اللون عشوائياً
+            self.ball.color = choice(colors)
+            # زيادة السرعة تدريجياً
+            self.ball.velocity_x *= 1.05
+            self.ball.velocity_y *= 1.05
+            # تحديث النقاط
+            self.score += 1
+            self.score_label.text = f"Score: {self.score}"
 
-    def finish(self, winner):
-        self.game_over = True
-        if winner is None:
-            self.status.text = "It's a draw 🤝"
-        elif winner == "X":
-            self.status.text = "You win! 🎉"
-        else:
-            self.status.text = "AI wins! 🤖"
-        # disable all remaining buttons
-        for i, v in enumerate(self.board):
-            if v == "":
-                self.buttons[i].disabled = True
-
-    def reset(self):
-        self.board = [""] * 9
-        self.game_over = False
-        self.status.text = "Your turn (X)"
-        for btn in self.buttons:
-            btn.text = ""
-            btn.disabled = False
-            btn.background_color = (1, 1, 1, 1)
-        # optional: let AI start sometimes
-        # if random.random() < 0.5:
-        #     Clock.schedule_once(lambda *_: self.ai_move(), 0.2)
-
-
-class XOApp(App):
+class PongApp(App):
     def build(self):
-        return TicTacToe()
+        game = PongGame()
+        return game
 
-
-if __name__ == "__main__":
-    XOApp().run()
+if __name__ == '__main__':
+    PongApp().run()
